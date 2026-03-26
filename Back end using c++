@@ -1,0 +1,511 @@
+/*
+ * ============================================================
+ *  Employee Business Management System — C++ Backend
+ *  Compile: g++ -std=c++17 -o server backend.cpp
+ *  Run:     ./server          (listens on port 8080)
+ * ============================================================
+ *
+ *  OOP Concepts Used:
+ *   - Inheritance      : Accountant, Cook, Assistant → Employee
+ *   - Virtual methods  : getRole(), getRoleCode(), display()
+ *   - Constructors     : parameterised + copy constructors
+ *   - Destructors      : virtual destructor in base class
+ *   - Encapsulation    : private data, public accessors/mutators
+ *   - Polymorphism     : vector<Employee*> holds mixed subtypes
+ *   - Abstract concept : Employee has pure-virtual getRole()
+ * ============================================================
+ */
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <algorithm>
+#include <cstring>
+#include <ctime>
+#include <memory>
+
+// ─── POSIX socket headers ──────────────────────────────────
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+
+// ═══════════════════════════════════════════════════════════
+//  BASE CLASS: Employee
+// ═══════════════════════════════════════════════════════════
+class Employee {
+protected:
+    std::string name;
+    std::string employeeId;   // e.g. "Acc-3", "Cook-5"
+    std::string hireDate;
+    double      salary;
+    std::string status;       // "Active" | "Demoted" | "Promoted"
+
+public:
+    // --- Parameterised Constructor ---
+    Employee(const std::string& n,
+             const std::string& id,
+             const std::string& date,
+             double sal,
+             const std::string& st = "Active")
+        : name(n), employeeId(id), hireDate(date), salary(sal), status(st) {
+        std::cout << "[Constructor] Employee created: " << name << " (" << employeeId << ")\n";
+    }
+
+    // --- Copy Constructor ---
+    Employee(const Employee& other)
+        : name(other.name), employeeId(other.employeeId),
+          hireDate(other.hireDate), salary(other.salary), status(other.status) {
+        std::cout << "[Copy Constructor] Copied employee: " << name << "\n";
+    }
+
+    // --- Virtual Destructor (essential for polymorphism) ---
+    virtual ~Employee() {
+        std::cout << "[Destructor] Employee removed: " << name << " (" << employeeId << ")\n";
+    }
+
+    // --- Pure Virtual Methods (makes Employee abstract-like) ---
+    virtual std::string getRole()     const = 0;
+    virtual std::string getRoleCode() const = 0;
+
+    // --- Accessors ---
+    std::string getName()       const { return name; }
+    std::string getEmployeeId() const { return employeeId; }
+    std::string getHireDate()   const { return hireDate; }
+    double      getSalary()     const { return salary; }
+    std::string getStatus()     const { return status; }
+
+    // --- Mutators ---
+    void setName(const std::string& n)   { name = n; }
+    void setSalary(double s)             { salary = s; }
+    void setStatus(const std::string& s) { status = s; }
+    void setEmployeeId(const std::string& id) { employeeId = id; }
+
+    // --- Virtual display ---
+    virtual void display() const {
+        std::cout << "  ID: "       << employeeId
+                  << "  Name: "     << name
+                  << "  Role: "     << getRole()
+                  << "  Hire: "     << hireDate
+                  << "  Salary: "   << salary
+                  << "  Status: "   << status << "\n";
+    }
+
+    // --- Serialise to CSV line ---
+    virtual std::string toCSV() const {
+        return name + "," + employeeId + "," + getRole() + "," +
+               hireDate + "," + std::to_string(salary) + "," + status;
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  DERIVED CLASS: Accountant
+// ═══════════════════════════════════════════════════════════
+class Accountant : public Employee {
+public:
+    Accountant(const std::string& n, const std::string& id,
+               const std::string& date, double sal,
+               const std::string& st = "Active")
+        : Employee(n, id, date, sal, st) {}
+
+    std::string getRole()     const override { return "Accountant"; }
+    std::string getRoleCode() const override { return "Acc"; }
+
+    void display() const override {
+        std::cout << "[Accountant] ";
+        Employee::display();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  DERIVED CLASS: Cook
+// ═══════════════════════════════════════════════════════════
+class Cook : public Employee {
+public:
+    Cook(const std::string& n, const std::string& id,
+         const std::string& date, double sal,
+         const std::string& st = "Active")
+        : Employee(n, id, date, sal, st) {}
+
+    std::string getRole()     const override { return "Cook"; }
+    std::string getRoleCode() const override { return "Cook"; }
+
+    void display() const override {
+        std::cout << "[Cook] ";
+        Employee::display();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  DERIVED CLASS: Assistant
+// ═══════════════════════════════════════════════════════════
+class Assistant : public Employee {
+public:
+    Assistant(const std::string& n, const std::string& id,
+              const std::string& date, double sal,
+              const std::string& st = "Active")
+        : Employee(n, id, date, sal, st) {}
+
+    std::string getRole()     const override { return "Assistant"; }
+    std::string getRoleCode() const override { return "As"; }
+
+    void display() const override {
+        std::cout << "[Assistant] ";
+        Employee::display();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  DERIVED CLASS: Manager
+// ═══════════════════════════════════════════════════════════
+class Manager : public Employee {
+public:
+    Manager(const std::string& n, const std::string& id,
+            const std::string& date, double sal,
+            const std::string& st = "Active")
+        : Employee(n, id, date, sal, st) {}
+
+    std::string getRole()     const override { return "Manager"; }
+    std::string getRoleCode() const override { return "Mgr"; }
+
+    void display() const override {
+        std::cout << "[Manager] ";
+        Employee::display();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  DERIVED CLASS: Driver
+// ═══════════════════════════════════════════════════════════
+class Driver : public Employee {
+public:
+    Driver(const std::string& n, const std::string& id,
+           const std::string& date, double sal,
+           const std::string& st = "Active")
+        : Employee(n, id, date, sal, st) {}
+
+    std::string getRole()     const override { return "Driver"; }
+    std::string getRoleCode() const override { return "Drv"; }
+
+    void display() const override {
+        std::cout << "[Driver] ";
+        Employee::display();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  EMPLOYEE REGISTRY (manages all employees)
+// ═══════════════════════════════════════════════════════════
+class EmployeeRegistry {
+private:
+    std::vector<Employee*> employees;
+    const std::string DATA_FILE = "employees.csv";
+
+    // Next ID counter per role
+    std::map<std::string, int> roleCounters;
+
+    void rebuildCounters() {
+        roleCounters.clear();
+        for (auto* e : employees) {
+            std::string code = e->getRoleCode();
+            std::string id   = e->getEmployeeId();
+            // extract number after dash
+            size_t pos = id.find('-');
+            if (pos != std::string::npos) {
+                int num = std::stoi(id.substr(pos + 1));
+                if (num > roleCounters[code]) roleCounters[code] = num;
+            }
+        }
+    }
+
+    std::string nextId(const std::string& roleCode) {
+        return roleCode + "-" + std::to_string(++roleCounters[roleCode]);
+    }
+
+    Employee* makeEmployee(const std::string& role,
+                           const std::string& name,
+                           const std::string& id,
+                           const std::string& date,
+                           double salary,
+                           const std::string& status = "Active") {
+        if      (role == "Accountant") return new Accountant(name, id, date, salary, status);
+        else if (role == "Cook")       return new Cook      (name, id, date, salary, status);
+        else if (role == "Assistant")  return new Assistant (name, id, date, salary, status);
+        else if (role == "Manager")    return new Manager   (name, id, date, salary, status);
+        else if (role == "Driver")     return new Driver    (name, id, date, salary, status);
+        return nullptr;
+    }
+
+    std::string roleToCode(const std::string& role) {
+        if (role == "Accountant") return "Acc";
+        if (role == "Cook")       return "Cook";
+        if (role == "Assistant")  return "As";
+        if (role == "Manager")    return "Mgr";
+        if (role == "Driver")     return "Drv";
+        return "Emp";
+    }
+
+public:
+    EmployeeRegistry() {
+        std::cout << "[Registry] Initialising Employee Registry...\n";
+        loadFromFile();
+    }
+
+    ~EmployeeRegistry() {
+        std::cout << "[Registry] Destroying Employee Registry...\n";
+        for (auto* e : employees) delete e;
+        employees.clear();
+    }
+
+    // ── Load from CSV ──────────────────────────────────────
+    void loadFromFile() {
+        std::ifstream file(DATA_FILE);
+        if (!file.is_open()) return;
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::istringstream ss(line);
+            std::string name, id, role, date, salStr, status;
+            std::getline(ss, name,   ',');
+            std::getline(ss, id,     ',');
+            std::getline(ss, role,   ',');
+            std::getline(ss, date,   ',');
+            std::getline(ss, salStr, ',');
+            std::getline(ss, status, ',');
+            double sal = salStr.empty() ? 0 : std::stod(salStr);
+            if (status.empty()) status = "Active";
+            Employee* e = makeEmployee(role, name, id, date, sal, status);
+            if (e) employees.push_back(e);
+        }
+        file.close();
+        rebuildCounters();
+        std::cout << "[Registry] Loaded " << employees.size() << " employees.\n";
+    }
+
+    // ── Save to CSV ────────────────────────────────────────
+    void saveToFile() const {
+        std::ofstream file(DATA_FILE, std::ios::trunc);
+        for (auto* e : employees)
+            file << e->toCSV() << "\n";
+        file.close();
+    }
+
+    // ── Add Employee ───────────────────────────────────────
+    std::string addEmployee(const std::string& role,
+                            const std::string& name,
+                            const std::string& date,
+                            double salary) {
+        std::string code = roleToCode(role);
+        std::string id   = nextId(code);
+        Employee* e = makeEmployee(role, name, id, date, salary);
+        if (!e) return R"({"success":false,"message":"Unknown role"})";
+        employees.push_back(e);
+        saveToFile();
+        return R"({"success":true,"id":")" + id + R"("})";
+    }
+
+    // ── Delete Employee ────────────────────────────────────
+    std::string deleteEmployee(const std::string& id) {
+        for (auto it = employees.begin(); it != employees.end(); ++it) {
+            if ((*it)->getEmployeeId() == id) {
+                delete *it;
+                employees.erase(it);
+                saveToFile();
+                return R"({"success":true})";
+            }
+        }
+        return R"({"success":false,"message":"Employee not found"})";
+    }
+
+    // ── Adjust Salary ──────────────────────────────────────
+    std::string adjustSalary(const std::string& id, double newSalary) {
+        for (auto* e : employees) {
+            if (e->getEmployeeId() == id) {
+                e->setSalary(newSalary);
+                saveToFile();
+                return R"({"success":true})";
+            }
+        }
+        return R"({"success":false,"message":"Employee not found"})";
+    }
+
+    // ── Set Status (promote/demote/active/fired) ───────────
+    std::string setStatus(const std::string& id, const std::string& status) {
+        for (auto* e : employees) {
+            if (e->getEmployeeId() == id) {
+                e->setStatus(status);
+                saveToFile();
+                return R"({"success":true})";
+            }
+        }
+        return R"({"success":false,"message":"Employee not found"})";
+    }
+
+    // ── Get All as JSON ────────────────────────────────────
+    std::string getAllJSON() const {
+        // Sort alphabetically by name
+        std::vector<Employee*> sorted = employees;
+        std::sort(sorted.begin(), sorted.end(), [](Employee* a, Employee* b){
+            return a->getName() < b->getName();
+        });
+
+        std::ostringstream json;
+        json << "[";
+        for (size_t i = 0; i < sorted.size(); ++i) {
+            auto* e = sorted[i];
+            json << "{"
+                 << "\"id\":\""      << e->getEmployeeId()  << "\","
+                 << "\"name\":\""    << e->getName()         << "\","
+                 << "\"role\":\""    << e->getRole()         << "\","
+                 << "\"hireDate\":\"" << e->getHireDate()   << "\","
+                 << "\"salary\":"    << e->getSalary()       << ","
+                 << "\"status\":\""  << e->getStatus()       << "\""
+                 << "}";
+            if (i + 1 < sorted.size()) json << ",";
+        }
+        json << "]";
+        return json.str();
+    }
+};
+
+// ═══════════════════════════════════════════════════════════
+//  HTTP HELPERS
+// ═══════════════════════════════════════════════════════════
+std::string urlDecode(const std::string& str) {
+    std::string result;
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '%' && i + 2 < str.size()) {
+            int val = std::stoi(str.substr(i+1, 2), nullptr, 16);
+            result += static_cast<char>(val);
+            i += 2;
+        } else if (str[i] == '+') {
+            result += ' ';
+        } else {
+            result += str[i];
+        }
+    }
+    return result;
+}
+
+std::map<std::string, std::string> parseQuery(const std::string& query) {
+    std::map<std::string, std::string> params;
+    std::istringstream ss(query);
+    std::string token;
+    while (std::getline(ss, token, '&')) {
+        size_t eq = token.find('=');
+        if (eq != std::string::npos)
+            params[urlDecode(token.substr(0, eq))] = urlDecode(token.substr(eq + 1));
+    }
+    return params;
+}
+
+std::string httpOK(const std::string& body, const std::string& ct = "application/json") {
+    return "HTTP/1.1 200 OK\r\n"
+           "Content-Type: " + ct + "\r\n"
+           "Access-Control-Allow-Origin: *\r\n"
+           "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
+           "Access-Control-Allow-Headers: Content-Type\r\n"
+           "Content-Length: " + std::to_string(body.size()) + "\r\n"
+           "\r\n" + body;
+}
+
+std::string httpOptions() {
+    return "HTTP/1.1 204 No Content\r\n"
+           "Access-Control-Allow-Origin: *\r\n"
+           "Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\n"
+           "Access-Control-Allow-Headers: Content-Type\r\n"
+           "\r\n";
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MAIN — HTTP SERVER
+// ═══════════════════════════════════════════════════════════
+int main() {
+    EmployeeRegistry registry;
+
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) { perror("socket"); return 1; }
+
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    sockaddr_in addr{};
+    addr.sin_family      = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port        = htons(8080);
+
+    if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) { perror("bind"); return 1; }
+    listen(server_fd, 10);
+
+    std::cout << "\n╔══════════════════════════════════════╗\n";
+    std::cout <<   "║  Business System Backend — Port 8080 ║\n";
+    std::cout <<   "╚══════════════════════════════════════╝\n\n";
+
+    while (true) {
+        int client_fd = accept(server_fd, nullptr, nullptr);
+        if (client_fd < 0) continue;
+
+        char buf[4096] = {};
+        read(client_fd, buf, sizeof(buf) - 1);
+        std::string request(buf);
+
+        // Parse method + path
+        std::istringstream reqStream(request);
+        std::string method, path, proto;
+        reqStream >> method >> path >> proto;
+
+        // Handle preflight
+        if (method == "OPTIONS") {
+            std::string resp = httpOptions();
+            write(client_fd, resp.c_str(), resp.size());
+            close(client_fd);
+            continue;
+        }
+
+        // Route: GET /employees
+        std::string response;
+        if (method == "GET" && path == "/employees") {
+            response = httpOK(registry.getAllJSON());
+        }
+        // Route: POST /employees  (body: name=...&role=...&date=...&salary=...)
+        else if (method == "POST" && path == "/employees") {
+            size_t bodyStart = request.find("\r\n\r\n");
+            std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+            auto p = parseQuery(body);
+            std::string res = registry.addEmployee(p["role"], p["name"], p["date"], std::stod(p["salary"]));
+            response = httpOK(res);
+        }
+        // Route: POST /delete  (body: id=...)
+        else if (method == "POST" && path == "/delete") {
+            size_t bodyStart = request.find("\r\n\r\n");
+            std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+            auto p = parseQuery(body);
+            response = httpOK(registry.deleteEmployee(p["id"]));
+        }
+        // Route: POST /salary  (body: id=...&salary=...)
+        else if (method == "POST" && path == "/salary") {
+            size_t bodyStart = request.find("\r\n\r\n");
+            std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+            auto p = parseQuery(body);
+            response = httpOK(registry.adjustSalary(p["id"], std::stod(p["salary"])));
+        }
+        // Route: POST /status  (body: id=...&status=...)
+        else if (method == "POST" && path == "/status") {
+            size_t bodyStart = request.find("\r\n\r\n");
+            std::string body = (bodyStart != std::string::npos) ? request.substr(bodyStart + 4) : "";
+            auto p = parseQuery(body);
+            response = httpOK(registry.setStatus(p["id"], p["status"]));
+        }
+        else {
+            response = httpOK(R"({"error":"Not found"})" );
+        }
+
+        write(client_fd, response.c_str(), response.size());
+        close(client_fd);
+    }
+
+    close(server_fd);
+    return 0;
+}
